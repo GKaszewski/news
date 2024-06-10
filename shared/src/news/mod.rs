@@ -1,4 +1,5 @@
-use anyhow::{Ok, Result};
+use anyhow::Result;
+use rusqlite::Connection;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +8,7 @@ pub struct NewsItem {
     pub title: String,
     pub author: Option<String>,
     pub body: String,
+    pub url: Option<String>,
 }
 
 impl Default for NewsItem {
@@ -15,6 +17,7 @@ impl Default for NewsItem {
             title: "".to_string(),
             author: None,
             body: "".to_string(),
+            url: None,
         }
     }
 }
@@ -26,7 +29,7 @@ pub enum NewsSource {
 
 // This function will parse the HTML content of a BBC news article
 // and return a NewsItem struct with the title, author, and body of the article.
-fn parse_bbc_news(file_content: &str) -> Result<NewsItem> {
+fn parse_bbc_news(file_content: &str, url: &str) -> Result<NewsItem> {
     let mut news = NewsItem::default();
     let document = Html::parse_document(file_content);
 
@@ -60,13 +63,14 @@ fn parse_bbc_news(file_content: &str) -> Result<NewsItem> {
     news.title = title.text().collect::<String>();
     news.author = author;
     news.body = body_text;
+    news.url = Some(url.to_string());
 
     Ok(news)
 }
 
 // This function will parse the HTML content of a Guardian news article
 // and return a NewsItem struct with the title, author, and body of the article.
-fn parse_guardian_news(file_content: &str) -> Result<NewsItem> {
+fn parse_guardian_news(file_content: &str, url: &str) -> Result<NewsItem> {
     let mut news = NewsItem::default();
     let document = Html::parse_document(file_content);
 
@@ -97,6 +101,7 @@ fn parse_guardian_news(file_content: &str) -> Result<NewsItem> {
 
     news.title = title.text().collect::<String>();
     news.body = body_text;
+    news.url = Some(url.to_string());
 
     Ok(news)
 }
@@ -110,10 +115,29 @@ async fn fetch_html(url: &str) -> Result<String> {
     Ok(html)
 }
 
-pub async fn fetch_news_from_url(url: &str, source: NewsSource) -> Result<NewsItem> {
+pub async fn fetch_news_from_url(
+    conn: &Connection,
+    url: &str,
+    source: NewsSource,
+) -> Result<NewsItem> {
+    let mut stmt =
+        conn.prepare("SELECT title, author, body, url FROM news_items WHERE url = ?1")?;
+    let mut rows = stmt.query_map([url], |row| {
+        Ok(NewsItem {
+            title: row.get(0)?,
+            author: row.get(1)?,
+            body: row.get(2)?,
+            url: row.get(3)?,
+        })
+    })?;
+
+    if let Some(news_item) = rows.next() {
+        return Ok(news_item?);
+    }
+
     let content = fetch_html(url).await?;
     match source {
-        NewsSource::BBC => parse_bbc_news(&content),
-        NewsSource::Guardian => parse_guardian_news(&content),
+        NewsSource::BBC => parse_bbc_news(&content, url),
+        NewsSource::Guardian => parse_guardian_news(&content, url),
     }
 }

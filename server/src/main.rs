@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use shared::{
-    db::{init_db, store_rss_items},
+    db::{init_db, store_news_item, store_rss_items},
     news::fetch_news_from_url,
     rss_feeds::{
         add_feed_url, clear_feed_urls, fetch_rss_from_feeds, filter_rss_items_by_source,
@@ -62,29 +62,11 @@ async fn main() {
     if let Some(item) = bbc_items.get(2) {
         println!("{:?}", item);
 
-        let news = fetch_news_from_url(&item.link, shared::news::NewsSource::BBC)
+        let news = fetch_news_from_url(&state.db, &item.link, shared::news::NewsSource::BBC)
             .await
             .expect("Failed to fetch news from URL");
+
+        store_news_item(&state.db, &news).expect("Failed to store news item");
         println!("{:?}", news);
-
-        let request_data = shared::ai::OpenAiRequest {
-            model: shared::ai::Model::Gpt3_5Turbo16k,
-            messages: vec![
-                shared::ai::Message {
-                    role: "system".to_string(),
-                    content: "You are a news summarizer. Summarize the following news article:"
-                        .to_string(),
-                },
-                shared::ai::Message {
-                    role: "user".to_string(),
-                    content: format!("{}\n\n{}", news.title, news.body),
-                },
-            ],
-            max_tokens: 256,
-        };
-
-        shared::ai::call_openai_api(request_data, "YOUR_API_KEY")
-            .await
-            .expect("Failed to call OpenAI API");
     }
 }

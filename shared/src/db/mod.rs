@@ -2,6 +2,7 @@ use anyhow::Result;
 use rusqlite::params;
 use rusqlite::Connection;
 
+use crate::news::NewsItem;
 use crate::rss_feeds::get_all_rss_items;
 use crate::rss_feeds::RssItem;
 
@@ -30,6 +31,17 @@ pub fn init_db() -> Result<Connection> {
         [],
     )?;
 
+    conn.execute(
+        "
+        CREATE TABLE IF NOT EXISTS news_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        author TEXT,
+        body TEXT,
+        url TEXT NOT NULL)",
+        [],
+    )?;
+
     Ok(conn)
 }
 
@@ -44,6 +56,15 @@ pub fn store_rss_items(conn: &Connection, items: &[RssItem]) -> Result<()> {
             params![item.title, item.link, item.description, item.pub_date, item.source],
         )?;
     }
+
+    Ok(())
+}
+
+pub fn store_news_item(conn: &Connection, item: &NewsItem) -> Result<()> {
+    conn.execute(
+        "INSERT INTO news_items (title, author, body, url) VALUES (?1, ?2, ?3, ?4)",
+        params![item.title, item.author, item.body, item.url],
+    )?;
 
     Ok(())
 }
