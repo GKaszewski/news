@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use shared::{
     db::{init_db, store_news_item, store_rss_items},
@@ -51,8 +51,9 @@ async fn setup_rss_feeds(state: &State) {
 
 #[tokio::main]
 async fn main() {
+    let db_path = PathBuf::from("news.db");
     let state = State {
-        db: Arc::new(init_db().expect("Failed to initialize database")),
+        db: Arc::new(init_db(&db_path).expect("Failed to initialize database")),
     };
     setup_rss_feeds(&state).await;
 

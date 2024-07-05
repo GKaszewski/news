@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use rusqlite::params;
 use rusqlite::Connection;
@@ -6,8 +8,8 @@ use crate::news::NewsItem;
 use crate::rss_feeds::get_all_rss_items;
 use crate::rss_feeds::RssItem;
 
-pub fn init_db() -> Result<Connection> {
-    let conn = Connection::open("rss_feeds.db")?;
+pub fn init_db(path: &PathBuf) -> Result<Connection, rusqlite::Error> {
+    let conn = Connection::open(path)?;
     conn.execute(
         "
         CREATE TABLE IF NOT EXISTS rss_items (
