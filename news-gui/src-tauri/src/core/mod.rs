@@ -1,45 +1,14 @@
-use std::{fs, sync::Mutex};
+use std::{
+    fs,
+    sync::{Mutex, OnceLock},
+};
 
 use rusqlite::Connection;
 use shared::db::init_db;
 use tauri::{AppHandle, Manager, State};
 
 pub struct ApplicationState {
-    pub db: Mutex<Option<Connection>>,
-}
-
-pub trait ServiceAccess {
-    fn db<F, TResult>(&self, operation: F) -> TResult
-    where
-        F: FnOnce(&Connection) -> TResult;
-
-    fn db_mut<F, TResult>(&self, operation: F) -> TResult
-    where
-        F: FnOnce(&mut Connection) -> TResult;
-}
-
-impl ServiceAccess for AppHandle {
-    fn db<F, TResult>(&self, operation: F) -> TResult
-    where
-        F: FnOnce(&Connection) -> TResult,
-    {
-        let app_state: State<ApplicationState> = self.state();
-        let db_connection_guard = app_state.db.lock().unwrap();
-        let db = db_connection_guard.as_ref().unwrap();
-
-        operation(db)
-    }
-
-    fn db_mut<F, TResult>(&self, operation: F) -> TResult
-    where
-        F: FnOnce(&mut Connection) -> TResult,
-    {
-        let app_state: State<ApplicationState> = self.state();
-        let mut db_connection_guard = app_state.db.lock().unwrap();
-        let db = db_connection_guard.as_mut().unwrap();
-
-        operation(db)
-    }
+    pub db: OnceLock<Mutex<Connection>>,
 }
 
 pub fn initialize_database(app_handle: &AppHandle) -> Result<Connection, rusqlite::Error> {

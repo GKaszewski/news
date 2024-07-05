@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use core::{initialize_database, ApplicationState};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use tauri::{Manager, State};
 
@@ -21,14 +21,17 @@ fn main() {
             items: Mutex::new(Vec::new()),
         })
         .manage(ApplicationState {
-            db: Default::default(),
+            db: OnceLock::new(),
         })
         .invoke_handler(tauri::generate_handler![greet])
         .setup(|app| {
             let handle = app.handle();
             let app_state: State<ApplicationState> = handle.state();
             let db = initialize_database(&handle).expect("Failed to initialize database");
-            *app_state.db.lock().unwrap() = Some(db);
+            app_state
+                .db
+                .set(Mutex::new(db))
+                .expect("Failed to set database");
 
             Ok(())
         })
