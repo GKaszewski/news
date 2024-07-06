@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use shared::{
-    db::{init, store_news_item, store_rss_items, DbPool},
+    db::{self, store_news_item, store_rss_items, DbPool},
     news::fetch_news_from_url,
     rss_feeds::{
         add_feed_url, clear_feed_urls, fetch_rss_from_feeds, filter_rss_items_by_source,
@@ -52,7 +52,7 @@ async fn setup_rss_feeds(state: &State) {
 async fn main() {
     let db_path = PathBuf::from("news.db");
     let state = State {
-        db: init(&db_path).expect("Failed to initialize database"),
+        db: db::init(&db_path).expect("Failed to initialize database"),
     };
     setup_rss_feeds(&state).await;
 
