@@ -1,11 +1,23 @@
-import { ScrollArea } from "@/components/ui/scroll-area";
-import ThemeToggle from "@/components/theme-toggle";
-import { Separator } from "@/components/ui/separator";
-import SettingsDialog from "@/components/settings-dialog";
-import useRssItems from "@/hooks/rss-items/use-rss-items";
-import { Skeleton } from "@/components/ui/skeleton";
-import { RssItem } from "@/lib/types";
-import useStore from "@/lib/store/store";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import ThemeToggle from '@/components/theme-toggle';
+import { Separator } from '@/components/ui/separator';
+import SettingsDialog from '@/components/settings-dialog';
+import useRssItems from '@/hooks/rss-items/use-rss-items';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RssItem } from '@/lib/types';
+import useStore from '@/lib/store/store';
+import { useMemo } from 'react';
+import { getGroupedRssItemsBySource } from '@/lib/utils';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/components/ui/collapsible';
+
+import BBCIcon from '@/assets/sites_icons/bbc.webp';
+import NYCTimesIcon from '@/assets/sites_icons/new_york_times.webp';
+import WyborczaIcon from '@/assets/sites_icons/wyborcza.webp';
+import RssFeedGroup from '../rss-feed-group';
 
 const Sidebar = () => {
   const {
@@ -17,6 +29,11 @@ const Sidebar = () => {
 
   const setSelectedText = useStore((state) => state.setSelectedText);
   const setSelectedRssItem = useStore((state) => state.setSelectedRssItem);
+
+  const groupedRssItems = useMemo(
+    () => getGroupedRssItemsBySource(rssItems || []),
+    [rssItems]
+  );
 
   const handleItemClick = (item: RssItem) => {
     setSelectedText(item.description);
@@ -37,16 +54,24 @@ const Sidebar = () => {
           {isRssItemsError && (
             <p>Error fetching rss items: {rssItemsError.message}</p>
           )}
-          {rssItems &&
-            rssItems.map((rssItem, index) => (
-              <p
-                className="transition-all duration-300 cursor-pointer hover:underline hover:text-blue-500"
-                key={`rss-item-${index}`}
-                onClick={() => handleItemClick(rssItem)}
-              >
-                {rssItem.title}
-              </p>
-            ))}
+          <RssFeedGroup
+            groupedRssItems={groupedRssItems}
+            handleItemClick={handleItemClick}
+            iconUrl={BBCIcon}
+            groupName="BBC World News"
+          />
+          <RssFeedGroup
+            groupedRssItems={groupedRssItems}
+            handleItemClick={handleItemClick}
+            iconUrl={NYCTimesIcon}
+            groupName="New York Times World News"
+          />
+          <RssFeedGroup
+            groupedRssItems={groupedRssItems}
+            handleItemClick={handleItemClick}
+            iconUrl={WyborczaIcon}
+            groupName="Gazeta Wyborcza"
+          />
         </div>
         <span className="flex-1" />
         <Separator />

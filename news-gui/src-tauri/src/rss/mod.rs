@@ -19,9 +19,8 @@ pub fn populate_rss_feeds(db: &DbPool) {
 pub async fn populate_rss_items(db: DbPool) -> Result<()> {
     let rss_map = fetch_rss_from_feeds(&db).await?;
 
-    for (url, items) in rss_map {
+    for (_, items) in rss_map {
         store_rss_items(&db, &items).expect("Failed to store RSS items");
-        println!("Fetched {} items from {}", items.len(), url);
     }
 
     Ok(())
@@ -38,7 +37,6 @@ pub async fn get_rss_items(db: DbPool) -> Result<Vec<RssItem>> {
         let _ = populate_rss_items(db.clone()).await;
         get_all_rss_items(&db)
     } else {
-        println!("Found {} items in the database", items.len());
         Ok(items)
     }
 }

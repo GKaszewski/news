@@ -26,7 +26,6 @@ async fn get_rss_items_command(app_handle: AppHandle) -> Vec<RssItem> {
     let Ok(items) = get_rss_items(db.clone()).await else {
         return [].to_vec();
     };
-    println!("{:?}", items);
     app_state.items.lock().unwrap().clone_from(&items);
     items
 }
