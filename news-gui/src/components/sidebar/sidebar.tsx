@@ -8,11 +8,6 @@ import { RssItem } from '@/lib/types';
 import useStore from '@/lib/store/store';
 import { useMemo } from 'react';
 import { getGroupedRssItemsBySource } from '@/lib/utils';
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from '@/components/ui/collapsible';
 
 import BBCIcon from '@/assets/sites_icons/bbc.webp';
 import NYCTimesIcon from '@/assets/sites_icons/new_york_times.webp';
