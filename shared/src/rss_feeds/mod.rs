@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Result};
 use rss::Channel;
-use rusqlite::{params, Connection};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
+
+use crate::db::DbPool;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RssItem {
@@ -24,7 +26,7 @@ pub struct FeedUrl {
 
 pub async fn fetch_rss_feed(url: &str, feed_name: &str) -> Result<Vec<RssItem>> {
     let content = reqwest::get(url).await?.bytes().await?;
-    if content.len() == 0 {
+    if content.is_empty() {
         bail!(format!("Failed to fetch rss feed {:?}", feed_name));
     }
     let channel = Channel::read_from(&content[..])?;
@@ -44,47 +46,50 @@ pub async fn fetch_rss_feed(url: &str, feed_name: &str) -> Result<Vec<RssItem>> 
     Ok(items)
 }
 
-pub fn delete_rss_feed(conn: &Connection, id: i32) -> Result<()> {
-    conn.execute("DELETE FROM feed_urls WHERE id = ?1", [id])?;
+pub fn delete_rss_feed(db: &DbPool, id: i32) -> Result<()> {
+    db.get()?
+        .execute("DELETE FROM feed_urls WHERE id = ?1", [id])?;
     Ok(())
 }
 
-pub fn clear_rss_items(conn: &Connection) -> Result<()> {
-    conn.execute("DELETE FROM rss_items", [])?;
+pub fn clear_rss_items(db: &DbPool) -> Result<()> {
+    db.get()?.execute("DELETE FROM rss_items", [])?;
     Ok(())
 }
 
-pub fn add_feed_url(conn: &Connection, url: &str, name: &str) -> Result<()> {
-    let existing_urls = get_all_feed_urls(conn)?;
+pub fn add_feed_url(db: &DbPool, url: &str, name: &str) -> Result<()> {
+    let existing_urls = get_all_feed_urls(db)?;
     if existing_urls.iter().any(|u| u.url == url) {
         return Ok(());
     }
-    conn.execute(
+    db.get()?.execute(
         "INSERT INTO feed_urls (url, name) VALUES (?1, ?2)",
         [url, name],
     )?;
     Ok(())
 }
 
-pub fn update_feed_url(conn: &Connection, id: i32, url: &str, name: &str) -> Result<()> {
-    conn.execute(
+pub fn update_feed_url(db: &DbPool, id: i32, url: &str, name: &str) -> Result<()> {
+    db.get()?.execute(
         "UPDATE feed_urls SET url = ?1, name = ?2 WHERE id = ?3",
         params![url, name, id],
     )?;
     Ok(())
 }
 
-pub fn delete_feed_url(conn: &Connection, url: &str) -> Result<()> {
-    conn.execute("DELETE FROM feed_urls WHERE url = ?1", [url])?;
+pub fn delete_feed_url(db: &DbPool, url: &str) -> Result<()> {
+    db.get()?
+        .execute("DELETE FROM feed_urls WHERE url = ?1", [url])?;
     Ok(())
 }
 
-pub fn clear_feed_urls(conn: &Connection) -> Result<()> {
-    conn.execute("DELETE FROM feed_urls", [])?;
+pub fn clear_feed_urls(db: &DbPool) -> Result<()> {
+    db.get()?.execute("DELETE FROM feed_urls", [])?;
     Ok(())
 }
 
-pub fn get_all_feed_urls(conn: &Connection) -> Result<Vec<FeedUrl>> {
+pub fn get_all_feed_urls(db: &DbPool) -> Result<Vec<FeedUrl>> {
+    let conn = db.get()?;
     let mut stmt = conn.prepare("SELECT id, url, name FROM feed_urls")?;
     let rows = stmt.query_map([], |row| {
         Ok(FeedUrl {
@@ -102,8 +107,8 @@ pub fn get_all_feed_urls(conn: &Connection) -> Result<Vec<FeedUrl>> {
     Ok(feeds)
 }
 
-pub async fn fetch_rss_from_feeds(conn: &Connection) -> Result<HashMap<String, Vec<RssItem>>> {
-    let feed_urls = get_all_feed_urls(conn)?;
+pub async fn fetch_rss_from_feeds(db: &DbPool) -> Result<HashMap<String, Vec<RssItem>>> {
+    let feed_urls = get_all_feed_urls(db)?;
     let mut rss_map = HashMap::new();
     for feed_url in feed_urls {
         let items = fetch_rss_feed(&feed_url.url, &feed_url.name).await?;
@@ -113,7 +118,8 @@ pub async fn fetch_rss_from_feeds(conn: &Connection) -> Result<HashMap<String, V
     Ok(rss_map)
 }
 
-pub fn get_all_rss_items(conn: &Connection) -> Result<Vec<RssItem>> {
+pub fn get_all_rss_items(db: &DbPool) -> Result<Vec<RssItem>> {
+    let conn = db.get()?;
     let mut stmt =
         conn.prepare("SELECT title, link, description, pub_date, source FROM rss_items")?;
     let rows = stmt.query_map([], |row| {
@@ -134,7 +140,8 @@ pub fn get_all_rss_items(conn: &Connection) -> Result<Vec<RssItem>> {
     Ok(items)
 }
 
-pub fn filter_rss_items_by_title(conn: &Connection, title: &str) -> Result<Vec<RssItem>> {
+pub fn filter_rss_items_by_title(db: &DbPool, title: &str) -> Result<Vec<RssItem>> {
+    let conn = db.get()?;
     let mut stmt = conn.prepare(
         "SELECT title, link, description, pub_date, source FROM rss_items WHERE title LIKE ?1",
     )?;
@@ -156,7 +163,8 @@ pub fn filter_rss_items_by_title(conn: &Connection, title: &str) -> Result<Vec<R
     Ok(items)
 }
 
-pub fn filter_rss_items_by_source(conn: &Connection, source: &str) -> Result<Vec<RssItem>> {
+pub fn filter_rss_items_by_source(db: &DbPool, source: &str) -> Result<Vec<RssItem>> {
+    let conn = db.get()?;
     let mut stmt = conn.prepare(
         "SELECT title, link, description, pub_date, source FROM rss_items WHERE source LIKE ?1",
     )?;

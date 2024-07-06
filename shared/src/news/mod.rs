@@ -1,7 +1,8 @@
 use anyhow::Result;
-use rusqlite::Connection;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
+
+use crate::db::DbPool;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewsItem {
@@ -43,10 +44,10 @@ fn parse_bbc_news(file_content: &str, url: &str) -> Result<NewsItem> {
         .next()
         .ok_or(anyhow::anyhow!("Failed to find title"))?;
 
-    let author = match document.select(&author_selector).next() {
-        Some(author) => Some(author.text().collect::<String>()),
-        None => None,
-    };
+    let author = document
+        .select(&author_selector)
+        .next()
+        .map(|author| author.text().collect::<String>());
 
     let body = document
         .select(&body_selector)
@@ -115,11 +116,8 @@ async fn fetch_html(url: &str) -> Result<String> {
     Ok(html)
 }
 
-pub async fn fetch_news_from_url(
-    conn: &Connection,
-    url: &str,
-    source: NewsSource,
-) -> Result<NewsItem> {
+pub async fn fetch_news_from_url(db: DbPool, url: &str, source: NewsSource) -> Result<NewsItem> {
+    let conn = db.get()?;
     let mut stmt =
         conn.prepare("SELECT title, author, body, url FROM news_items WHERE url = ?1")?;
     let mut rows = stmt.query_map([url], |row| {

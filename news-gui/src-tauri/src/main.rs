@@ -19,19 +19,16 @@ fn get_feeds(app_handle: AppHandle) -> Vec<FeedUrl> {
 }
 
 #[tauri::command]
-fn get_rss_items_command(app_handle: AppHandle) -> Vec<RssItem> {
+async fn get_rss_items_command(app_handle: AppHandle) -> Vec<RssItem> {
     let app_state: State<ApplicationState> = app_handle.state();
     let db = app_state.db();
 
-    let items = tauri::async_runtime::block_on(get_rss_items(&db));
-    match items {
-        Ok(items) => {
-            println!("{:?}", items);
-            *app_state.items.lock().unwrap() = items.clone();
-            return items;
-        }
-        Err(_) => [].to_vec(),
-    }
+    let Ok(items) = get_rss_items(db.clone()).await else {
+        return [].to_vec();
+    };
+    println!("{:?}", items);
+    app_state.items.lock().unwrap().clone_from(&items);
+    items
 }
 
 fn main() {
@@ -46,14 +43,11 @@ fn main() {
             let handle = app.handle();
             let app_state: State<ApplicationState> = handle.state();
             let db = initialize_database(&handle).expect("Failed to initialize database");
-            app_state
-                .db
-                .set(Mutex::new(db))
-                .expect("Failed to set database");
+            app_state.db.set(db).expect("Failed to set database");
 
             let db = app_state.db();
-            populate_rss_feeds(&db);
-            let feed_urls = get_all_feed_urls(&db).expect("Failed to get all feed URLs");
+            populate_rss_feeds(db);
+            let feed_urls = get_all_feed_urls(db).expect("Failed to get all feed URLs");
             *app_state.feeds.lock().unwrap() = feed_urls;
 
             Ok(())
