@@ -12,8 +12,16 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from '../ui/collapsible';
+import useFeeds from '@/hooks/feeds/use-feeds';
+import { Skeleton } from '../ui/skeleton';
 
 const SettingsDialog = () => {
+  const {
+    data: feeds,
+    isLoading: fetchingFeeds,
+    isError: fetchignFeedsError,
+  } = useFeeds();
+
   return (
     <Dialog>
       <div className="inline-flex items-center gap-2">
@@ -26,12 +34,12 @@ const SettingsDialog = () => {
       </div>
       <DialogContent className="sm:max-w-[425px] w-[720px] min-h-[400px] flex flex-col">
         <DialogHeader>
-          <Label className="font-bold text-lg">Settings</Label>
+          <Label className="text-lg font-bold">Settings</Label>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-2">
             <Collapsible>
-              <div className="inline-flex gap-2 items-center">
+              <div className="inline-flex items-center gap-2">
                 <CollapsibleTrigger>
                   <Button variant="outline" size="icon">
                     <Plus className="w-4 h-4" />
@@ -46,11 +54,24 @@ const SettingsDialog = () => {
           </div>
           <div className="flex flex-col gap-2">
             <Collapsible>
-              <CollapsibleTrigger className="inline-flex gap-2 items-center font-semibold">
+              <CollapsibleTrigger className="inline-flex items-center gap-2 font-semibold">
                 <Newspaper className="w-4 h-4" /> RSS Feeds
               </CollapsibleTrigger>
-              <CollapsibleContent>
-                <p>RSS Feeds content here</p>
+              <CollapsibleContent className="flex flex-col w-full gap-1">
+                {fetchingFeeds && <Skeleton className="w-full h-10" />}
+                {fetchignFeedsError && <p>Error fetching feeds</p>}
+                {feeds && feeds.length === 0 && <p>No feeds available</p>}
+                {feeds &&
+                  feeds.map((feed, index) => (
+                    <a
+                      href={feed.url}
+                      target="_blank"
+                      className="underline truncate"
+                      key={`feeed-${index}`}
+                    >
+                      {feed.name}
+                    </a>
+                  ))}
               </CollapsibleContent>
             </Collapsible>
           </div>

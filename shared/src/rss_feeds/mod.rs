@@ -5,7 +5,7 @@ use rss::Channel;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RssItem {
     pub title: String,
     pub link: String,
@@ -14,7 +14,7 @@ pub struct RssItem {
     pub source: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FeedUrl {
     pub id: i32,
     pub url: String,
