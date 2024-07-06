@@ -20,7 +20,6 @@ async fn setup_rss_feeds(state: &State) {
         ("https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml".to_string(), "New York Times World News".to_string()),
         ("https://www.aljazeera.com/xml/rss/all.xml".to_string(), "Al Jazeera".to_string()),
         ("https://rss.gazeta.pl/pub/rss/najnowsze_wyborcza.xml".to_string(), "Gazeta Wyborcza".to_string()),
-        ("https://www.theguardian.com/world/poland/rss".to_string(), "The Guardian".to_string()),
     ];
 
     clear_feed_urls(&db).expect("Failed to clear feed URLs");

@@ -1,2 +1,3 @@
 /target
 *.db
+models/WizardLM-7B.bin

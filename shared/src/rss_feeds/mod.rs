@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use rss::Channel;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ pub struct RssItem {
     pub title: String,
     pub link: String,
     pub description: Option<String>,
+    #[serde(rename = "pubDate")]
     pub pub_date: Option<String>,
     pub source: Option<String>,
 }
@@ -23,6 +24,9 @@ pub struct FeedUrl {
 
 pub async fn fetch_rss_feed(url: &str, feed_name: &str) -> Result<Vec<RssItem>> {
     let content = reqwest::get(url).await?.bytes().await?;
+    if content.len() == 0 {
+        bail!(format!("Failed to fetch rss feed {:?}", feed_name));
+    }
     let channel = Channel::read_from(&content[..])?;
 
     let items = channel

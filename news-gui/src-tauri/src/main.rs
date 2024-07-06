@@ -4,7 +4,8 @@
 use core::{initialize_database, ApplicationState};
 use std::sync::{Mutex, OnceLock};
 
-use shared::rss_feeds::{add_feed_url, get_all_feed_urls, FeedUrl};
+use rss::{get_rss_items, populate_rss_feeds};
+use shared::rss_feeds::{get_all_feed_urls, FeedUrl, RssItem};
 use tauri::{AppHandle, Manager, State};
 
 pub mod core;
@@ -17,6 +18,22 @@ fn get_feeds(app_handle: AppHandle) -> Vec<FeedUrl> {
     feeds.clone()
 }
 
+#[tauri::command]
+fn get_rss_items_command(app_handle: AppHandle) -> Vec<RssItem> {
+    let app_state: State<ApplicationState> = app_handle.state();
+    let db = app_state.db();
+
+    let items = tauri::async_runtime::block_on(get_rss_items(&db));
+    match items {
+        Ok(items) => {
+            println!("{:?}", items);
+            *app_state.items.lock().unwrap() = items.clone();
+            return items;
+        }
+        Err(_) => [].to_vec(),
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(ApplicationState {
@@ -24,29 +41,20 @@ fn main() {
             feeds: Mutex::new(Vec::new()),
             items: Mutex::new(Vec::new()),
         })
-        .invoke_handler(tauri::generate_handler![get_feeds])
+        .invoke_handler(tauri::generate_handler![get_feeds, get_rss_items_command])
         .setup(|app| {
             let handle = app.handle();
             let app_state: State<ApplicationState> = handle.state();
             let db = initialize_database(&handle).expect("Failed to initialize database");
-            let urls: Vec<(String, String)> = vec![
-        ("https://feeds.bbci.co.uk/news/world/rss.xml".to_string(), "BBC World News".to_string()),
-        ("https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml".to_string(), "New York Times World News".to_string()),
-        ("https://rss.gazeta.pl/pub/rss/najnowsze_wyborcza.xml".to_string(), "Gazeta Wyborcza".to_string()),
-        ("https://www.theguardian.com/world/poland/rss".to_string(), "The Guardian".to_string()),
-    ];
             app_state
                 .db
                 .set(Mutex::new(db))
                 .expect("Failed to set database");
 
             let db = app_state.db();
-                 for (url, name) in urls {
-        add_feed_url(&db, &url, &name).expect("Failed to add feed URL");
-
-        let feed_urls = get_all_feed_urls(&db).expect("Failed to get all feed URLs");
-        *app_state.feeds.lock().unwrap() = feed_urls;
-    }
+            populate_rss_feeds(&db);
+            let feed_urls = get_all_feed_urls(&db).expect("Failed to get all feed URLs");
+            *app_state.feeds.lock().unwrap() = feed_urls;
 
             Ok(())
         })

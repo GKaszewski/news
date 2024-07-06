@@ -1869,12 +1869,14 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 name = "news-gui"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "rusqlite",
  "serde",
  "serde_json",
  "shared",
  "tauri",
  "tauri-build",
+ "tokio",
 ]
 
 [[package]]
