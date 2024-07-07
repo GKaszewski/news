@@ -64,7 +64,9 @@ fn main() {
 
             let db = app_state.db();
             populate_rss_feeds(db);
-            let feed_urls = get_all_feed_urls(db).expect("Failed to get all feed URLs");
+            let feed_urls = get_all_feed_urls(db)
+                .await
+                .expect("Failed to get all feed URLs");
             *app_state.feeds.lock().unwrap() = feed_urls;
 
             Ok(())

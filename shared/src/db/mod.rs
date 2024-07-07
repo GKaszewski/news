@@ -1,85 +1,50 @@
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::params;
 use std::path::Path;
+
+use anyhow::Result;
+use sqlx::SqlitePool;
 
 use crate::news::NewsItem;
 use crate::rss_feeds::get_all_rss_items;
 use crate::rss_feeds::RssItem;
 
-pub type DbPool = r2d2::Pool<SqliteConnectionManager>;
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error(transparent)]
-    Pool(#[from] r2d2::Error),
-    #[error(transparent)]
-    Connection(#[from] rusqlite::Error),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-pub fn init(path: &Path) -> Result<DbPool> {
-    let manager = SqliteConnectionManager::file(path);
-    let pool = r2d2::Pool::new(manager).unwrap();
-    let conn = pool.get()?;
-
-    conn.execute(
-        "
-        CREATE TABLE IF NOT EXISTS rss_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        link TEXT NOT NULL,
-        description TEXT,
-        pub_date TEXT,
-        source TEXT)
-    ",
-        [],
-    )?;
-
-    conn.execute(
-        "
-        CREATE TABLE IF NOT EXISTS feed_urls (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        url TEXT NOT NULL,
-        name TEXT NOT NULL)
-    ",
-        [],
-    )?;
-
-    conn.execute(
-        "
-        CREATE TABLE IF NOT EXISTS news_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        author TEXT,
-        body TEXT,
-        url TEXT NOT NULL)",
-        [],
-    )?;
+pub async fn init(path: &Path) -> Result<SqlitePool> {
+    let pool = SqlitePool::connect(path.to_str().unwrap()).await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     Ok(pool)
 }
 
-pub fn store_rss_items(db: &DbPool, items: &[RssItem]) -> anyhow::Result<()> {
-    let existing_items = get_all_rss_items(db)?;
+pub async fn store_rss_items(db: &SqlitePool, items: &[RssItem]) -> Result<()> {
+    let existing_items = get_all_rss_items(db).await?;
     for item in items {
         if existing_items.iter().any(|i| i.link == item.link) {
             continue;
         }
-        db.get()?.execute(
+        let mut conn = db.acquire().await?;
+        sqlx::query!(
             "INSERT INTO rss_items (title, link, description, pub_date, source) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![item.title, item.link, item.description, item.pub_date, item.source],
-        )?;
+            item.title,
+            item.link,
+            item.description,
+            item.pub_date,
+            item.source
+        ).execute(&mut *conn).await?;
     }
 
     Ok(())
 }
 
-pub fn store_news_item(db: DbPool, item: NewsItem) -> Result<()> {
-    db.get()?.execute(
+pub async fn store_news_item(db: &SqlitePool, item: NewsItem) -> Result<()> {
+    let mut conn = db.acquire().await?;
+    sqlx::query!(
         "INSERT INTO news_items (title, author, body, url) VALUES (?1, ?2, ?3, ?4)",
-        params![item.title, item.author, item.body, item.url],
-    )?;
+        item.title,
+        item.author,
+        item.body,
+        item.url
+    )
+    .execute(&mut *conn)
+    .await?;
 
     Ok(())
 }

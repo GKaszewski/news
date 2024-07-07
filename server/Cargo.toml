@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
 shared = { path = "../shared" }
-rusqlite = { version = "0.31.0", features = ["bundled"] }

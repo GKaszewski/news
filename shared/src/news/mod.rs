@@ -1,10 +1,9 @@
 use anyhow::Result;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
+use sqlx::{prelude::FromRow, SqlitePool};
 
-use crate::db::DbPool;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct NewsItem {
     pub title: String,
     pub author: Option<String>,
@@ -117,21 +116,18 @@ async fn fetch_html(url: &str) -> Result<String> {
     Ok(html)
 }
 
-pub async fn fetch_news_from_url(db: DbPool, url: &str, source: NewsSource) -> Result<NewsItem> {
-    let conn = db.get()?;
-    let mut stmt =
-        conn.prepare("SELECT title, author, body, url FROM news_items WHERE url = ?1")?;
-    let mut rows = stmt.query_map([url], |row| {
-        Ok(NewsItem {
-            title: row.get(0)?,
-            author: row.get(1)?,
-            body: row.get(2)?,
-            url: row.get(3)?,
-        })
-    })?;
+pub async fn fetch_news_from_url(
+    db: &SqlitePool,
+    url: &str,
+    source: NewsSource,
+) -> Result<NewsItem> {
+    let query = sqlx::query_as::<_, NewsItem>(
+        "SELECT title, author, body, url FROM news_items WHERE url = ?1",
+    );
+    let news_item: Vec<NewsItem> = query.fetch_all(db).await?;
 
-    if let Some(news_item) = rows.next() {
-        return Ok(news_item?);
+    if !news_item.is_empty() {
+        return Ok(news_item[0].clone());
     }
 
     let content = fetch_html(url).await?;

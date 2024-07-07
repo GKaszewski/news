@@ -2,12 +2,10 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Result};
 use rss::Channel;
-use rusqlite::params;
 use serde::{Deserialize, Serialize};
+use sqlx::{prelude::FromRow, SqlitePool};
 
-use crate::db::DbPool;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct RssItem {
     pub title: String,
     pub link: String,
@@ -17,7 +15,7 @@ pub struct RssItem {
     pub source: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct FeedUrl {
     pub id: i32,
     pub url: String,
@@ -46,69 +44,81 @@ pub async fn fetch_rss_feed(url: &str, feed_name: &str) -> Result<Vec<RssItem>> 
     Ok(items)
 }
 
-pub fn delete_rss_feed(db: &DbPool, id: i32) -> Result<()> {
-    db.get()?
-        .execute("DELETE FROM feed_urls WHERE id = ?1", [id])?;
+pub async fn delete_rss_feed(db: &SqlitePool, id: i32) -> Result<()> {
+    let mut conn = db.acquire().await?;
+    sqlx::query!("DELETE FROM rss_items WHERE source = ?1", id)
+        .execute(&mut *conn)
+        .await?;
+
     Ok(())
 }
 
-pub fn clear_rss_items(db: &DbPool) -> Result<()> {
-    db.get()?.execute("DELETE FROM rss_items", [])?;
+pub async fn clear_rss_items(db: &SqlitePool) -> Result<()> {
+    let mut conn = db.acquire().await?;
+    sqlx::query!("DELETE FROM rss_items")
+        .execute(&mut *conn)
+        .await?;
+
     Ok(())
 }
 
-pub fn add_feed_url(db: &DbPool, url: &str, name: &str) -> Result<()> {
-    let existing_urls = get_all_feed_urls(db)?;
+pub async fn add_feed_url(db: &SqlitePool, url: &str, name: &str) -> Result<()> {
+    let existing_urls = get_all_feed_urls(db).await?;
     if existing_urls.iter().any(|u| u.url == url) {
         return Ok(());
     }
-    db.get()?.execute(
+
+    let mut conn = db.acquire().await?;
+    sqlx::query!(
         "INSERT INTO feed_urls (url, name) VALUES (?1, ?2)",
-        [url, name],
-    )?;
+        url,
+        name
+    )
+    .execute(&mut *conn)
+    .await?;
+
     Ok(())
 }
 
-pub fn update_feed_url(db: &DbPool, id: i32, url: &str, name: &str) -> Result<()> {
-    db.get()?.execute(
+pub async fn update_feed_url(db: &SqlitePool, id: i32, url: &str, name: &str) -> Result<()> {
+    let mut conn = db.acquire().await?;
+    sqlx::query!(
         "UPDATE feed_urls SET url = ?1, name = ?2 WHERE id = ?3",
-        params![url, name, id],
-    )?;
+        url,
+        name,
+        id
+    )
+    .execute(&mut *conn)
+    .await?;
+
     Ok(())
 }
 
-pub fn delete_feed_url(db: &DbPool, url: &str) -> Result<()> {
-    db.get()?
-        .execute("DELETE FROM feed_urls WHERE url = ?1", [url])?;
+pub async fn delete_feed_url(db: &SqlitePool, url: &str) -> Result<()> {
+    let mut conn = db.acquire().await?;
+    sqlx::query!("DELETE FROM feed_urls WHERE url = ?1", url)
+        .execute(&mut *conn)
+        .await?;
     Ok(())
 }
 
-pub fn clear_feed_urls(db: &DbPool) -> Result<()> {
-    db.get()?.execute("DELETE FROM feed_urls", [])?;
+pub async fn clear_feed_urls(db: &SqlitePool) -> Result<()> {
+    let mut conn = db.acquire().await?;
+    sqlx::query!("DELETE FROM feed_urls")
+        .execute(&mut *conn)
+        .await?;
     Ok(())
 }
 
-pub fn get_all_feed_urls(db: &DbPool) -> Result<Vec<FeedUrl>> {
-    let conn = db.get()?;
-    let mut stmt = conn.prepare("SELECT id, url, name FROM feed_urls")?;
-    let rows = stmt.query_map([], |row| {
-        Ok(FeedUrl {
-            id: row.get(0)?,
-            url: row.get(1)?,
-            name: row.get(2)?,
-        })
-    })?;
+pub async fn get_all_feed_urls(db: &SqlitePool) -> Result<Vec<FeedUrl>> {
+    let query = sqlx::query_as::<_, FeedUrl>("SELECT id, url, name FROM feed_urls");
+    let feed_urls: Vec<FeedUrl> = query.fetch_all(db).await?;
 
-    let mut feeds = Vec::new();
-    for feed in rows {
-        feeds.push(feed?);
-    }
-
-    Ok(feeds)
+    Ok(feed_urls)
 }
 
-pub async fn fetch_rss_from_feeds(db: &DbPool) -> Result<HashMap<String, Vec<RssItem>>> {
-    let feed_urls = get_all_feed_urls(db)?;
+pub async fn fetch_rss_from_feeds(db: &SqlitePool) -> Result<HashMap<String, Vec<RssItem>>> {
+    let feed_urls = get_all_feed_urls(db).await?;
     let mut rss_map = HashMap::new();
     for feed_url in feed_urls {
         let items = fetch_rss_feed(&feed_url.url, &feed_url.name).await?;
@@ -118,70 +128,29 @@ pub async fn fetch_rss_from_feeds(db: &DbPool) -> Result<HashMap<String, Vec<Rss
     Ok(rss_map)
 }
 
-pub fn get_all_rss_items(db: &DbPool) -> Result<Vec<RssItem>> {
-    let conn = db.get()?;
-    let mut stmt =
-        conn.prepare("SELECT title, link, description, pub_date, source FROM rss_items")?;
-    let rows = stmt.query_map([], |row| {
-        Ok(RssItem {
-            title: row.get(0)?,
-            link: row.get(1)?,
-            description: row.get(2)?,
-            pub_date: row.get(3)?,
-            source: row.get(4)?,
-        })
-    })?;
+pub async fn get_all_rss_items(db: &SqlitePool) -> Result<Vec<RssItem>> {
+    let query = sqlx::query_as::<_, RssItem>(
+        "SELECT title, link, description, pub_date, source FROM rss_items",
+    );
+    let rss_items: Vec<RssItem> = query.fetch_all(db).await?;
 
-    let mut items = Vec::new();
-    for item in rows {
-        items.push(item?);
-    }
-
-    Ok(items)
+    Ok(rss_items)
 }
 
-pub fn filter_rss_items_by_title(db: &DbPool, title: &str) -> Result<Vec<RssItem>> {
-    let conn = db.get()?;
-    let mut stmt = conn.prepare(
+pub async fn filter_rss_items_by_title(db: &SqlitePool, title: &str) -> Result<Vec<RssItem>> {
+    let query = sqlx::query_as::<_, RssItem>(
         "SELECT title, link, description, pub_date, source FROM rss_items WHERE title LIKE ?1",
-    )?;
-    let rows = stmt.query_map([format!("%{}%", title)], |row| {
-        Ok(RssItem {
-            title: row.get(0)?,
-            link: row.get(1)?,
-            description: row.get(2)?,
-            pub_date: row.get(3)?,
-            source: row.get(4)?,
-        })
-    })?;
+    );
+    let rss_items: Vec<RssItem> = query.bind(format!("%{}%", title)).fetch_all(db).await?;
 
-    let mut items = Vec::new();
-    for item in rows {
-        items.push(item?);
-    }
-
-    Ok(items)
+    Ok(rss_items)
 }
 
-pub fn filter_rss_items_by_source(db: DbPool, source: &str) -> Result<Vec<RssItem>> {
-    let conn = db.get()?;
-    let mut stmt = conn.prepare(
+pub async fn filter_rss_items_by_source(db: &SqlitePool, source: &str) -> Result<Vec<RssItem>> {
+    let query = sqlx::query_as::<_, RssItem>(
         "SELECT title, link, description, pub_date, source FROM rss_items WHERE source LIKE ?1",
-    )?;
-    let rows = stmt.query_map([format!("%{}%", source)], |row| {
-        Ok(RssItem {
-            title: row.get(0)?,
-            link: row.get(1)?,
-            description: row.get(2)?,
-            pub_date: row.get(3)?,
-            source: row.get(4)?,
-        })
-    })?;
+    );
+    let rss_items: Vec<RssItem> = query.bind(format!("%{}%", source)).fetch_all(db).await?;
 
-    let mut items = Vec::new();
-    for item in rows {
-        items.push(item?);
-    }
-
-    Ok(items)
+    Ok(rss_items)
 }

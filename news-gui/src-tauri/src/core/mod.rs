@@ -4,13 +4,14 @@ use std::{
 };
 
 use shared::{
-    db::{self, DbPool},
+    db::{self},
     rss_feeds::{FeedUrl, RssItem},
 };
+use sqlx::SqlitePool;
 use tauri::AppHandle;
 
 pub struct ApplicationState {
-    pub db: OnceLock<DbPool>,
+    pub db: OnceLock<SqlitePool>,
     pub feeds: Mutex<Vec<FeedUrl>>,
     pub items: Mutex<Vec<RssItem>>,
 }
