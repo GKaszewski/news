@@ -1,6 +1,7 @@
 use anyhow::Result;
 use shared::{
-    db::{store_rss_items, DbPool},
+    db::{store_news_item, store_rss_items, DbPool},
+    news::{fetch_news_from_url, NewsItem},
     rss_feeds::{add_feed_url, fetch_rss_from_feeds, get_all_rss_items, RssItem},
 };
 
@@ -39,4 +40,11 @@ pub async fn get_rss_items(db: DbPool) -> Result<Vec<RssItem>> {
     } else {
         Ok(items)
     }
+}
+
+pub async fn get_news_item_from_url(db: DbPool, url: String) -> Result<NewsItem> {
+    let news_item =
+        fetch_news_from_url(db.clone(), url.as_str(), shared::news::NewsSource::BBC).await?;
+    store_news_item(db, news_item.clone())?;
+    Ok(news_item)
 }

@@ -4,8 +4,11 @@
 use core::{initialize_database, ApplicationState};
 use std::sync::{Mutex, OnceLock};
 
-use rss::{get_rss_items, populate_rss_feeds};
-use shared::rss_feeds::{get_all_feed_urls, FeedUrl, RssItem};
+use rss::{get_news_item_from_url, get_rss_items, populate_rss_feeds};
+use shared::{
+    news::NewsItem,
+    rss_feeds::{get_all_feed_urls, FeedUrl, RssItem},
+};
 use tauri::{AppHandle, Manager, State};
 
 pub mod core;
@@ -30,6 +33,17 @@ async fn get_rss_items_command(app_handle: AppHandle) -> Vec<RssItem> {
     items
 }
 
+#[tauri::command]
+async fn get_news_from_url_command(url: String, app_handle: AppHandle) -> NewsItem {
+    let app_state: State<ApplicationState> = app_handle.state();
+    let db = app_state.db();
+    let Ok(item) = get_news_item_from_url(db.clone(), url).await else {
+        return NewsItem::default();
+    };
+
+    item
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(ApplicationState {
@@ -37,7 +51,11 @@ fn main() {
             feeds: Mutex::new(Vec::new()),
             items: Mutex::new(Vec::new()),
         })
-        .invoke_handler(tauri::generate_handler![get_feeds, get_rss_items_command])
+        .invoke_handler(tauri::generate_handler![
+            get_feeds,
+            get_rss_items_command,
+            get_news_from_url_command
+        ])
         .setup(|app| {
             let handle = app.handle();
             let app_state: State<ApplicationState> = handle.state();

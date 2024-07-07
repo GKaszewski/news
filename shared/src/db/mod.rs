@@ -75,7 +75,7 @@ pub fn store_rss_items(db: &DbPool, items: &[RssItem]) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn store_news_item(db: &DbPool, item: &NewsItem) -> Result<()> {
+pub fn store_news_item(db: DbPool, item: NewsItem) -> Result<()> {
     db.get()?.execute(
         "INSERT INTO news_items (title, author, body, url) VALUES (?1, ?2, ?3, ?4)",
         params![item.title, item.author, item.body, item.url],

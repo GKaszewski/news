@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::db::DbPool;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewsItem {
     pub title: String,
     pub author: Option<String>,
@@ -23,6 +23,7 @@ impl Default for NewsItem {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum NewsSource {
     BBC,
     Guardian,

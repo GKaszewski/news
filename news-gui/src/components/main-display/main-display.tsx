@@ -1,4 +1,4 @@
-import useStore from '@/lib/store/store';
+import useStore from "@/lib/store/store";
 
 const MainDisplay = () => {
   const selectedRssItem = useStore((state) => state.selectedRssItem);
@@ -8,10 +8,12 @@ const MainDisplay = () => {
       <div className="h-full p-8 w-[80ch]">
         {selectedRssItem && (
           <>
-            <h1 className="mb-8 text-2xl font-semibold text-center">
+            <h1 className="mb-8 font-semibold text-center md:text-lg lg:text-2xl">
               {selectedRssItem.title}
             </h1>
-            <p className="text-lg ">{selectedRssItem.description}</p>
+            <p className="text-base break-words lg:text-lg">
+              {selectedRssItem.description}
+            </p>
             <a
               href={selectedRssItem.link}
               target="_blank"

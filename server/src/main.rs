@@ -56,7 +56,7 @@ async fn main() {
     };
     setup_rss_feeds(&state).await;
 
-    let bbc_items = filter_rss_items_by_source(&state.db, "BBC World News")
+    let bbc_items = filter_rss_items_by_source(state.db.clone(), "BBC World News")
         .expect("Failed to filter RSS items by source");
 
     if let Some(item) = bbc_items.get(2) {
@@ -66,7 +66,7 @@ async fn main() {
             .await
             .expect("Failed to fetch news from URL");
 
-        store_news_item(&state.db, &news).expect("Failed to store news item");
+        store_news_item(state.db, news.clone()).expect("Failed to store news item");
         println!("{:?}", news);
     }
 }

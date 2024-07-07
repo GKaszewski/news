@@ -163,7 +163,7 @@ pub fn filter_rss_items_by_title(db: &DbPool, title: &str) -> Result<Vec<RssItem
     Ok(items)
 }
 
-pub fn filter_rss_items_by_source(db: &DbPool, source: &str) -> Result<Vec<RssItem>> {
+pub fn filter_rss_items_by_source(db: DbPool, source: &str) -> Result<Vec<RssItem>> {
     let conn = db.get()?;
     let mut stmt = conn.prepare(
         "SELECT title, link, description, pub_date, source FROM rss_items WHERE source LIKE ?1",
